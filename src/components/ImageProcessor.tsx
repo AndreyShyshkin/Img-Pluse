@@ -386,10 +386,6 @@ const ImageProcessor: React.FC = () => {
 
 				{selectedImages.length > 0 && (
 					<div className='space-y-6'>
-						{processedImages.some(img => img.canvas) && (
-							<ProcessingStats processedImages={processedImages} />
-						)}
-
 						{activeTab === 'format' && (
 							<FormatConverter
 								images={selectedImages}
@@ -465,6 +461,10 @@ const ImageProcessor: React.FC = () => {
 									</span>
 								</button>
 							</div>
+						)}
+
+						{processedImages.some(img => img.canvas) && (
+							<ProcessingStats processedImages={processedImages} />
 						)}
 
 						{history.length > 0 && (
