@@ -1,6 +1,5 @@
 'use client'
 
-import HelpModal from '@/components/HelpModal'
 import ImageProcessor from '@/components/ImageProcessor'
 
 export default function Home() {
@@ -14,7 +13,6 @@ export default function Home() {
 				</header>
 
 				<ImageProcessor />
-				<HelpModal />
 			</div>
 		</div>
 	)
