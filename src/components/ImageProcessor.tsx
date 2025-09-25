@@ -52,9 +52,12 @@ const ImageProcessor: React.FC = () => {
 				const processed = files.map(file => ({
 					file,
 					originalSize: file.size,
-					url: URL.createObjectURL(file), // Додаємо превью для оригінальних файлів
+					url: URL.createObjectURL(file),
+					mimeType: file.type,
+					quality: file.type === 'image/jpeg' ? 0.9 : undefined,
 				}))
 				setProcessedImages(processed)
+				setHistory([])
 			}
 		},
 		[]
@@ -69,9 +72,12 @@ const ImageProcessor: React.FC = () => {
 			const processed = imageFiles.map(file => ({
 				file,
 				originalSize: file.size,
-				url: URL.createObjectURL(file), // Додаємо превью для оригінальних файлів
+				url: URL.createObjectURL(file),
+				mimeType: file.type,
+				quality: file.type === 'image/jpeg' ? 1.0 : undefined,
 			}))
 			setProcessedImages(processed)
+			setHistory([])
 		}
 	}, [])
 
@@ -82,7 +88,6 @@ const ImageProcessor: React.FC = () => {
 		[]
 	)
 
-	// Функції для роботи з історією
 	const addToHistory = useCallback(
 		(operation: string, description: string, images: ProcessedImage[]) => {
 			const newEntry: HistoryEntry = {
@@ -92,7 +97,6 @@ const ImageProcessor: React.FC = () => {
 				description,
 				processedImages: images.map(img => ({
 					...img,
-					// Клонуємо canvas для збереження в історії
 					canvas: img.canvas ? cloneCanvas(img.canvas) : undefined,
 				})),
 			}
@@ -110,25 +114,30 @@ const ImageProcessor: React.FC = () => {
 		return clone
 	}
 
-	const restoreFromHistory = useCallback((entry: HistoryEntry) => {
-		setProcessedImages(
-			entry.processedImages.map(img => ({
-				...img,
-				// Клонуємо canvas при відновленні
-				canvas: img.canvas ? cloneCanvas(img.canvas) : undefined,
-				url: img.canvas
-					? img.canvas.toDataURL(img.mimeType || 'image/png', img.quality)
-					: img.url,
-			}))
-		)
-	}, [])
+	const restoreFromHistory = useCallback(
+		(entry: HistoryEntry) => {
+			const entryIndex = history.findIndex(h => h.id === entry.id)
+
+			setHistory(prev => prev.slice(0, entryIndex + 1))
+
+			setProcessedImages(
+				entry.processedImages.map(img => ({
+					...img,
+					canvas: img.canvas ? cloneCanvas(img.canvas) : undefined,
+					url: img.canvas
+						? img.canvas.toDataURL(img.mimeType || 'image/png', img.quality)
+						: img.url,
+				}))
+			)
+		},
+		[history]
+	)
 
 	const downloadFromHistory = useCallback(async (entry: HistoryEntry) => {
 		const images = entry.processedImages
 		if (images.length === 0) return
 
 		if (images.length === 1 && images[0].canvas) {
-			// Завантажити одне зображення
 			const img = images[0]
 			img.canvas!.toBlob(
 				blob => {
@@ -150,7 +159,6 @@ const ImageProcessor: React.FC = () => {
 				img.quality
 			)
 		} else if (images.length > 1) {
-			// Створити ZIP архів для декількох зображень
 			const zip = new JSZip()
 
 			for (const image of images) {
@@ -183,11 +191,22 @@ const ImageProcessor: React.FC = () => {
 		}
 	}, [])
 
+	const resetToOriginal = useCallback(() => {
+		const originalProcessed = selectedImages.map(file => ({
+			file,
+			originalSize: file.size,
+			url: URL.createObjectURL(file),
+			mimeType: file.type,
+			quality: file.type === 'image/jpeg' ? 0.9 : undefined,
+		}))
+		setProcessedImages(originalProcessed)
+		setHistory([])
+	}, [selectedImages])
+
 	const downloadAll = useCallback(async () => {
 		if (processedImages.length === 0) return
 
 		if (processedImages.length === 1 && processedImages[0].canvas) {
-			// Завантажити одне зображення
 			const processedImage = processedImages[0]
 			processedImage.canvas!.toBlob(
 				blob => {
@@ -209,7 +228,6 @@ const ImageProcessor: React.FC = () => {
 				processedImage.quality
 			)
 		} else if (processedImages.length > 1) {
-			// Створити ZIP архів для декількох зображень
 			const zip = new JSZip()
 
 			for (const image of processedImages) {
@@ -242,7 +260,6 @@ const ImageProcessor: React.FC = () => {
 		}
 	}, [processedImages])
 
-	// Очищення URL при зміні компонента
 	useEffect(() => {
 		return () => {
 			processedImages.forEach(image => {
@@ -263,7 +280,6 @@ const ImageProcessor: React.FC = () => {
 
 	return (
 		<div className='max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden'>
-			{/* Вкладки */}
 			<div className='border-b border-gray-200 dark:border-gray-700'>
 				<nav className='-mb-px flex space-x-8 px-6'>
 					{tabs.map(tab => (
@@ -284,7 +300,6 @@ const ImageProcessor: React.FC = () => {
 			</div>
 
 			<div className='p-6'>
-				{/* Область завантаження файлів */}
 				<div
 					className='border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center mb-6 hover:border-blue-400 dark:hover:border-blue-500 transition-colors'
 					onDrop={handleDrop}
@@ -318,7 +333,6 @@ const ImageProcessor: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Список вибраних зображень */}
 				{selectedImages.length > 0 && (
 					<div className='mb-6'>
 						<h3 className='text-lg font-semibold mb-4 text-gray-800 dark:text-white'>
@@ -370,10 +384,8 @@ const ImageProcessor: React.FC = () => {
 					</div>
 				)}
 
-				{/* Контент вкладок */}
 				{selectedImages.length > 0 && (
 					<div className='space-y-6'>
-						{/* Статистика обробки */}
 						{processedImages.some(img => img.canvas) && (
 							<ProcessingStats processedImages={processedImages} />
 						)}
@@ -438,7 +450,6 @@ const ImageProcessor: React.FC = () => {
 							/>
 						)}
 
-						{/* Кнопка завантаження */}
 						{processedImages.some(img => img.canvas) && (
 							<div className='flex justify-center'>
 								<button
@@ -456,7 +467,6 @@ const ImageProcessor: React.FC = () => {
 							</div>
 						)}
 
-						{/* Історія змін */}
 						{history.length > 0 && (
 							<div className='mt-8 border-t border-gray-200 dark:border-gray-700 pt-6'>
 								<h3 className='text-lg font-semibold mb-4 text-gray-800 dark:text-white flex items-center'>
@@ -520,11 +530,11 @@ const ImageProcessor: React.FC = () => {
 								</div>
 								<div className='mt-4 text-center'>
 									<button
-										onClick={() => setHistory([])}
+										onClick={resetToOriginal}
 										className='text-red-500 hover:text-red-700 text-sm transition-colors flex items-center justify-center mx-auto space-x-1'
 									>
 										<span>🗑️</span>
-										<span>Очистити історію</span>
+										<span>Скинути до оригіналу</span>
 									</button>
 								</div>
 							</div>

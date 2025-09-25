@@ -5,7 +5,7 @@ import { ProcessedImage } from './ImageProcessor'
 
 interface ColorBalanceProps {
 	images: File[]
-	processedImages: ProcessedImage[] // Додаємо існуючі оброблені зображення
+	processedImages: ProcessedImage[]
 	onProcess: (images: ProcessedImage[]) => void
 	isProcessing: boolean
 	setIsProcessing: (processing: boolean) => void
@@ -33,24 +33,24 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 
 		for (const file of images) {
 			try {
-				// Знаходимо відповідний processedImage для збереження формату та використання попереднього результату
 				const existingProcessedImage = existingProcessedImages?.find(
 					p => p.file === file
 				)
-				const targetMimeType = existingProcessedImage?.mimeType || 'image/png'
-				const targetQuality = existingProcessedImage?.quality
+
+				const targetMimeType =
+					existingProcessedImage?.mimeType || file.type || 'image/png'
+				const targetQuality =
+					existingProcessedImage?.quality ||
+					(file.type === 'image/jpeg' ? 0.9 : undefined)
 
 				const canvas = document.createElement('canvas')
 				const ctx = canvas.getContext('2d')
 
-				// Використовуємо існуючий canvas або створюємо з файлу
 				if (existingProcessedImage?.canvas) {
-					// Використовуємо попередній результат
 					canvas.width = existingProcessedImage.canvas.width
 					canvas.height = existingProcessedImage.canvas.height
 					ctx?.drawImage(existingProcessedImage.canvas, 0, 0)
 				} else {
-					// Завантажуємо оригінальний файл
 					const img = new Image()
 					await new Promise((resolve, reject) => {
 						img.onload = resolve
@@ -72,19 +72,16 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 						let g = data[i + 1]
 						let b = data[i + 2]
 
-						// Корекція кольорового балансу
 						r = Math.max(0, Math.min(255, r + redAdjustment))
 						g = Math.max(0, Math.min(255, g + greenAdjustment))
 						b = Math.max(0, Math.min(255, b + blueAdjustment))
 
-						// Корекція яскравості
 						if (brightness !== 0) {
 							r = Math.max(0, Math.min(255, r + brightness))
 							g = Math.max(0, Math.min(255, g + brightness))
 							b = Math.max(0, Math.min(255, b + brightness))
 						}
 
-						// Корекція контрастності
 						if (contrast !== 0) {
 							const factor = (259 * (contrast + 255)) / (255 * (259 - contrast))
 							r = Math.max(0, Math.min(255, factor * (r - 128) + 128))
@@ -92,9 +89,7 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 							b = Math.max(0, Math.min(255, factor * (b - 128) + 128))
 						}
 
-						// Корекція насиченості
 						if (saturation !== 0) {
-							// Конвертація в HSL для корекції насиченості
 							const max = Math.max(r, g, b) / 255
 							const min = Math.min(r, g, b) / 255
 							const diff = max - min
@@ -141,7 +136,6 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 					ctx.putImageData(imageData, 0, 0)
 				}
 
-				// Конвертація у blob для отримання розміру
 				const blob = await new Promise<Blob | null>(resolve =>
 					canvas.toBlob(resolve, targetMimeType, targetQuality)
 				)
@@ -288,7 +282,6 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 					))}
 				</div>
 
-				{/* Попередження про якість */}
 				<div className='mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg'>
 					<div className='flex items-start space-x-3'>
 						<span className='text-yellow-600 dark:text-yellow-400 mt-0.5'>
@@ -307,7 +300,6 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 					</div>
 				</div>
 
-				{/* Інформація про файли */}
 				<div className='mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg'>
 					<div className='flex items-center justify-between'>
 						<div>
@@ -321,7 +313,6 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 					</div>
 				</div>
 
-				{/* Кнопка застосування */}
 				<div className='mt-6'>
 					<button
 						onClick={adjustImages}

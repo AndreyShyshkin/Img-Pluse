@@ -61,7 +61,6 @@ const FormatConverter: React.FC<FormatConverterProps> = ({
 				canvas.height = img.height
 				ctx?.drawImage(img, 0, 0)
 
-				// Конвертація у вибраний формат
 				const mimeType = `image/${targetFormat}`
 				const blob = await new Promise<Blob | null>(resolve =>
 					canvas.toBlob(
@@ -113,7 +112,6 @@ const FormatConverter: React.FC<FormatConverterProps> = ({
 				</h3>
 
 				<div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-					{/* Вибір формату */}
 					<div>
 						<label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3'>
 							Цільовий формат
@@ -147,7 +145,6 @@ const FormatConverter: React.FC<FormatConverterProps> = ({
 						</div>
 					</div>
 
-					{/* Налаштування якості */}
 					{targetFormat === 'jpeg' && (
 						<div>
 							<label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3'>
@@ -170,7 +167,6 @@ const FormatConverter: React.FC<FormatConverterProps> = ({
 					)}
 				</div>
 
-				{/* Інформація про файли */}
 				<div className='mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg'>
 					<div className='flex items-center justify-between'>
 						<div>
@@ -184,7 +180,6 @@ const FormatConverter: React.FC<FormatConverterProps> = ({
 					</div>
 				</div>
 
-				{/* Кнопка конвертації */}
 				<div className='mt-6'>
 					<button
 						onClick={convertImages}

@@ -19,7 +19,6 @@
 	}
 }
 
-/* Анімації для перетягування файлів */
 .drag-over {
 	background: linear-gradient(45deg, #3b82f6, #1d4ed8) !important;
 	border: 2px solid #3b82f6 !important;
@@ -27,7 +26,6 @@
 	transition: all 0.2s ease;
 }
 
-/* Кастомні стилі для range inputs */
 input[type='range'] {
 	-webkit-appearance: none;
 	appearance: none;
@@ -67,7 +65,6 @@ input[type='range']::-moz-range-track {
 	border: none;
 }
 
-/* Стилі для preview зображень */
 .image-preview {
 	transition: all 0.3s ease;
 }
@@ -77,7 +74,6 @@ input[type='range']::-moz-range-track {
 	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
-/* Стилі для анімації завантаження */
 .loading-spinner {
 	animation: spin 1s linear infinite;
 }
@@ -91,7 +87,6 @@ input[type='range']::-moz-range-track {
 	}
 }
 
-/* Покращення доступності */
 .sr-only {
 	position: absolute;
 	width: 1px;

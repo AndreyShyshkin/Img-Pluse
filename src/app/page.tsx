@@ -11,10 +11,6 @@ export default function Home() {
 					<h1 className='text-4xl font-bold text-gray-800 dark:text-white mb-4'>
 						Обробка зображень
 					</h1>
-					<p className='text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
-						Потужний інструмент для конвертації форматів, зміни розмірів,
-						корекції кольорів та налаштування колірного балансу зображень
-					</p>
 				</header>
 
 				<ImageProcessor />

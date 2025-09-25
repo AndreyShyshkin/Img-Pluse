@@ -5,7 +5,7 @@ import { ProcessedImage } from './ImageProcessor'
 
 interface ColorTransformProps {
 	images: File[]
-	processedImages: ProcessedImage[] // Додаємо існуючі оброблені зображення
+	processedImages: ProcessedImage[]
 	onProcess: (images: ProcessedImage[]) => void
 	isProcessing: boolean
 	setIsProcessing: (processing: boolean) => void
@@ -52,7 +52,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 		},
 	]
 
-	// Функція для обчислення відстані між кольорами
 	const colorDistance = (
 		r1: number,
 		g1: number,
@@ -66,7 +65,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 		)
 	}
 
-	// Конвертація hex у RGB
 	const hexToRgb = (hex: string) => {
 		const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
 		return result
@@ -86,24 +84,24 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 
 		for (const file of images) {
 			try {
-				// Знаходимо відповідний processedImage для збереження формату та використання попереднього результату
 				const existingProcessedImage = existingProcessedImages?.find(
 					p => p.file === file
 				)
-				const targetMimeType = existingProcessedImage?.mimeType || 'image/png'
-				const targetQuality = existingProcessedImage?.quality
+
+				const targetMimeType =
+					existingProcessedImage?.mimeType || file.type || 'image/png'
+				const targetQuality =
+					existingProcessedImage?.quality ||
+					(file.type === 'image/jpeg' ? 0.9 : undefined)
 
 				const canvas = document.createElement('canvas')
 				const ctx = canvas.getContext('2d')
 
-				// Використовуємо існуючий canvas або створюємо з файлу
 				if (existingProcessedImage?.canvas) {
-					// Використовуємо попередній результат
 					canvas.width = existingProcessedImage.canvas.width
 					canvas.height = existingProcessedImage.canvas.height
 					ctx?.drawImage(existingProcessedImage.canvas, 0, 0)
 				} else {
-					// Завантажуємо оригінальний файл
 					const img = new Image()
 					await new Promise((resolve, reject) => {
 						img.onload = resolve
@@ -140,7 +138,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 										sourceRgb.b
 									)
 									if (distance <= tolerance) {
-										// Плавний перехід на основі відстані
 										const factor = 1 - distance / tolerance
 										data[i] = Math.round(r + (targetRgb.r - r) * factor)
 										data[i + 1] = Math.round(g + (targetRgb.g - g) * factor)
@@ -185,7 +182,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 					ctx.putImageData(imageData, 0, 0)
 				}
 
-				// Конвертація у blob для отримання розміру
 				const blob = await new Promise<Blob | null>(resolve =>
 					canvas.toBlob(resolve, targetMimeType, targetQuality)
 				)
@@ -227,7 +223,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 					Налаштування перетворення кольорів
 				</h3>
 
-				{/* Вибір типу перетворення */}
 				<div className='mb-6'>
 					<label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3'>
 						Тип перетворення
@@ -264,7 +259,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 					</div>
 				</div>
 
-				{/* Налаштування заміни кольору */}
 				{transformType === 'replace' && (
 					<div className='space-y-4'>
 						<div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
@@ -334,7 +328,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 					</div>
 				)}
 
-				{/* Інформація про файли */}
 				<div className='mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg'>
 					<div className='flex items-center justify-between'>
 						<div>
@@ -348,7 +341,6 @@ const ColorTransform: React.FC<ColorTransformProps> = ({
 					</div>
 				</div>
 
-				{/* Кнопка перетворення */}
 				<div className='mt-6'>
 					<button
 						onClick={transformImages}

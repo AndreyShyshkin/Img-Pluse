@@ -5,7 +5,7 @@ import { ProcessedImage } from './ImageProcessor'
 
 interface SizeConverterProps {
 	images: File[]
-	processedImages: ProcessedImage[] // Додаємо існуючі оброблені зображення
+	processedImages: ProcessedImage[]
 	onProcess: (images: ProcessedImage[]) => void
 	isProcessing: boolean
 	setIsProcessing: (processing: boolean) => void
@@ -41,29 +41,28 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 
 		for (const file of images) {
 			try {
-				// Знаходимо відповідний processedImage для збереження формату та використання попереднього результату
 				const existingProcessedImage = existingProcessedImages.find(
 					p => p.file === file
 				)
-				const targetMimeType = existingProcessedImage?.mimeType || 'image/png'
-				const targetQuality = existingProcessedImage?.quality
+
+				const targetMimeType =
+					existingProcessedImage?.mimeType || file.type || 'image/png'
+				const targetQuality =
+					existingProcessedImage?.quality ||
+					(file.type === 'image/jpeg' ? 0.9 : undefined)
 
 				const canvas = document.createElement('canvas')
 				const ctx = canvas.getContext('2d')
 				const img = new Image()
 
-				// Використовуємо існуючий canvas або створюємо з файлу
 				if (existingProcessedImage?.canvas) {
-					// Використовуємо попередній результат
 					canvas.width = existingProcessedImage.canvas.width
 					canvas.height = existingProcessedImage.canvas.height
 					ctx?.drawImage(existingProcessedImage.canvas, 0, 0)
 
-					// Встановлюємо розміри для обчислення нових розмірів
 					img.width = existingProcessedImage.canvas.width
 					img.height = existingProcessedImage.canvas.height
 				} else {
-					// Завантажуємо оригінальний файл (навіть якщо existingProcessedImage існує без canvas)
 					await new Promise((resolve, reject) => {
 						img.onload = resolve
 						img.onerror = reject
@@ -75,14 +74,12 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 					ctx?.drawImage(img, 0, 0)
 				}
 
-				// Створюємо новий canvas для результату
 				const outputCanvas = document.createElement('canvas')
 				const outputCtx = outputCanvas.getContext('2d')
 
 				let newWidth = img.width
 				let newHeight = img.height
 
-				// Обчислення нових розмірів
 				switch (resizeMode) {
 					case 'percentage':
 						newWidth = Math.round((img.width * percentage) / 100)
@@ -120,14 +117,12 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 				outputCanvas.width = newWidth
 				outputCanvas.height = newHeight
 
-				// Використовуємо високоякісний алгоритм масштабування
 				if (outputCtx) {
 					outputCtx.imageSmoothingEnabled = true
 					outputCtx.imageSmoothingQuality = 'high'
 					outputCtx.drawImage(canvas, 0, 0, newWidth, newHeight)
 				}
 
-				// Конвертація у blob для отримання розміру
 				const blob = await new Promise<Blob | null>(resolve =>
 					outputCanvas.toBlob(resolve, targetMimeType, targetQuality)
 				)
@@ -170,7 +165,6 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 					Налаштування зміни розміру
 				</h3>
 
-				{/* Вибір режиму */}
 				<div className='mb-6'>
 					<label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3'>
 						Режим зміни розміру
@@ -202,7 +196,6 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 					</div>
 				</div>
 
-				{/* Налаштування розмірів */}
 				<div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
 					{resizeMode === 'percentage' && (
 						<div>
@@ -258,7 +251,6 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 					)}
 				</div>
 
-				{/* Опція збереження пропорцій */}
 				{(resizeMode === 'fixed' ||
 					resizeMode === 'width' ||
 					resizeMode === 'height') && (
@@ -277,7 +269,6 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 					</div>
 				)}
 
-				{/* Інформація про файли */}
 				<div className='mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg'>
 					<div className='flex items-center justify-between'>
 						<div>
@@ -291,7 +282,6 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 					</div>
 				</div>
 
-				{/* Кнопка зміни розміру */}
 				<div className='mt-6'>
 					<button
 						onClick={resizeImages}

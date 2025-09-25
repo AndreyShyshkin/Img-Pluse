@@ -45,7 +45,6 @@ const ProcessingStats: React.FC<ProcessingStatsProps> = ({
 			</h3>
 
 			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-				{/* Загальна кількість файлів */}
 				<div className='bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4'>
 					<div className='text-2xl font-bold text-blue-600 dark:text-blue-400'>
 						{processedImages.length}
@@ -55,7 +54,6 @@ const ProcessingStats: React.FC<ProcessingStatsProps> = ({
 					</div>
 				</div>
 
-				{/* Загальна економія простору */}
 				<div className='bg-green-50 dark:bg-green-900/20 rounded-lg p-4'>
 					<div
 						className={`text-2xl font-bold ${getCompressionColor(percentage)}`}
@@ -72,7 +70,6 @@ const ProcessingStats: React.FC<ProcessingStatsProps> = ({
 					</div>
 				</div>
 
-				{/* Середня компресія */}
 				<div className='bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4'>
 					<div
 						className={`text-2xl font-bold ${getCompressionColor(
@@ -87,7 +84,6 @@ const ProcessingStats: React.FC<ProcessingStatsProps> = ({
 					</div>
 				</div>
 
-				{/* Загальний розмір */}
 				<div className='bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4'>
 					<div className='text-lg font-bold text-orange-600 dark:text-orange-400'>
 						{formatFileSize(totalOriginalSize)}
@@ -102,7 +98,6 @@ const ProcessingStats: React.FC<ProcessingStatsProps> = ({
 				</div>
 			</div>
 
-			{/* Детальна статистика для кожного файлу */}
 			{processedImages.length > 1 && (
 				<details className='mt-6'>
 					<summary className='cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'>
@@ -147,7 +142,6 @@ const ProcessingStats: React.FC<ProcessingStatsProps> = ({
 				</details>
 			)}
 
-			{/* Поради з оптимізації */}
 			<div className='mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg'>
 				<h4 className='text-sm font-semibold text-gray-800 dark:text-white mb-2'>
 					💡 Поради з оптимізації
