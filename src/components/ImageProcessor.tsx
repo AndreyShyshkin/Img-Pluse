@@ -1,0 +1,539 @@
+'use client'
+
+import { saveAs } from 'file-saver'
+import JSZip from 'jszip'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import ColorBalance from './ColorBalance'
+import ColorTransform from './ColorTransform'
+import FormatConverter from './FormatConverter'
+import ProcessingStats from './ProcessingStats'
+import SizeConverter from './SizeConverter'
+
+export interface ProcessedImage {
+	file: File
+	originalSize: number
+	newSize?: number
+	canvas?: HTMLCanvasElement
+	url?: string
+	mimeType?: string
+	quality?: number
+}
+
+export interface HistoryEntry {
+	id: string
+	timestamp: Date
+	operation: string
+	description: string
+	processedImages: ProcessedImage[]
+}
+
+const ImageProcessor: React.FC = () => {
+	const [selectedImages, setSelectedImages] = useState<File[]>([])
+	const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
+	const [history, setHistory] = useState<HistoryEntry[]>([])
+	const [activeTab, setActiveTab] = useState<
+		'format' | 'size' | 'color' | 'balance'
+	>('format')
+	const [isProcessing, setIsProcessing] = useState(false)
+	const fileInputRef = useRef<HTMLInputElement>(null)
+
+	const tabs = [
+		{ id: 'format' as const, label: 'Конвертація форматів', icon: '🔄' },
+		{ id: 'size' as const, label: 'Зміна розміру', icon: '📏' },
+		{ id: 'color' as const, label: 'Перетворення кольорів', icon: '🎨' },
+		{ id: 'balance' as const, label: 'Колірний баланс', icon: '⚖️' },
+	]
+
+	const handleImageSelect = useCallback(
+		(event: React.ChangeEvent<HTMLInputElement>) => {
+			const files = Array.from(event.target.files || [])
+			if (files.length > 0) {
+				setSelectedImages(files)
+				const processed = files.map(file => ({
+					file,
+					originalSize: file.size,
+					url: URL.createObjectURL(file), // Додаємо превью для оригінальних файлів
+				}))
+				setProcessedImages(processed)
+			}
+		},
+		[]
+	)
+
+	const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+		event.preventDefault()
+		const files = Array.from(event.dataTransfer.files)
+		const imageFiles = files.filter(file => file.type.startsWith('image/'))
+		if (imageFiles.length > 0) {
+			setSelectedImages(imageFiles)
+			const processed = imageFiles.map(file => ({
+				file,
+				originalSize: file.size,
+				url: URL.createObjectURL(file), // Додаємо превью для оригінальних файлів
+			}))
+			setProcessedImages(processed)
+		}
+	}, [])
+
+	const handleDragOver = useCallback(
+		(event: React.DragEvent<HTMLDivElement>) => {
+			event.preventDefault()
+		},
+		[]
+	)
+
+	// Функції для роботи з історією
+	const addToHistory = useCallback(
+		(operation: string, description: string, images: ProcessedImage[]) => {
+			const newEntry: HistoryEntry = {
+				id: Date.now().toString(),
+				timestamp: new Date(),
+				operation,
+				description,
+				processedImages: images.map(img => ({
+					...img,
+					// Клонуємо canvas для збереження в історії
+					canvas: img.canvas ? cloneCanvas(img.canvas) : undefined,
+				})),
+			}
+			setHistory(prev => [...prev, newEntry])
+		},
+		[]
+	)
+
+	const cloneCanvas = (original: HTMLCanvasElement): HTMLCanvasElement => {
+		const clone = document.createElement('canvas')
+		const ctx = clone.getContext('2d')
+		clone.width = original.width
+		clone.height = original.height
+		ctx?.drawImage(original, 0, 0)
+		return clone
+	}
+
+	const restoreFromHistory = useCallback((entry: HistoryEntry) => {
+		setProcessedImages(
+			entry.processedImages.map(img => ({
+				...img,
+				// Клонуємо canvas при відновленні
+				canvas: img.canvas ? cloneCanvas(img.canvas) : undefined,
+				url: img.canvas
+					? img.canvas.toDataURL(img.mimeType || 'image/png', img.quality)
+					: img.url,
+			}))
+		)
+	}, [])
+
+	const downloadFromHistory = useCallback(async (entry: HistoryEntry) => {
+		const images = entry.processedImages
+		if (images.length === 0) return
+
+		if (images.length === 1 && images[0].canvas) {
+			// Завантажити одне зображення
+			const img = images[0]
+			img.canvas!.toBlob(
+				blob => {
+					if (blob) {
+						const fileName = `${entry.operation}-${img.file.name.replace(
+							/\.[^/.]+$/,
+							''
+						)}.${
+							img.mimeType === 'image/jpeg'
+								? 'jpg'
+								: img.mimeType === 'image/webp'
+								? 'webp'
+								: 'png'
+						}`
+						saveAs(blob, fileName)
+					}
+				},
+				img.mimeType || 'image/png',
+				img.quality
+			)
+		} else if (images.length > 1) {
+			// Створити ZIP архів для декількох зображень
+			const zip = new JSZip()
+
+			for (const image of images) {
+				if (image.canvas) {
+					const blob = await new Promise<Blob | null>(resolve =>
+						image.canvas!.toBlob(
+							resolve,
+							image.mimeType || 'image/png',
+							image.quality
+						)
+					)
+					if (blob) {
+						const fileName = `${entry.operation}-${image.file.name.replace(
+							/\.[^/.]+$/,
+							''
+						)}.${
+							image.mimeType === 'image/jpeg'
+								? 'jpg'
+								: image.mimeType === 'image/webp'
+								? 'webp'
+								: 'png'
+						}`
+						zip.file(fileName, blob)
+					}
+				}
+			}
+
+			const content = await zip.generateAsync({ type: 'blob' })
+			saveAs(content, `${entry.operation}-images.zip`)
+		}
+	}, [])
+
+	const downloadAll = useCallback(async () => {
+		if (processedImages.length === 0) return
+
+		if (processedImages.length === 1 && processedImages[0].canvas) {
+			// Завантажити одне зображення
+			const processedImage = processedImages[0]
+			processedImage.canvas!.toBlob(
+				blob => {
+					if (blob) {
+						const fileName = `processed-${processedImage.file.name.replace(
+							/\.[^/.]+$/,
+							''
+						)}.${
+							processedImage.mimeType === 'image/jpeg'
+								? 'jpg'
+								: processedImage.mimeType === 'image/webp'
+								? 'webp'
+								: 'png'
+						}`
+						saveAs(blob, fileName)
+					}
+				},
+				processedImage.mimeType || 'image/png',
+				processedImage.quality
+			)
+		} else if (processedImages.length > 1) {
+			// Створити ZIP архів для декількох зображень
+			const zip = new JSZip()
+
+			for (const image of processedImages) {
+				if (image.canvas) {
+					const blob = await new Promise<Blob | null>(resolve =>
+						image.canvas!.toBlob(
+							resolve,
+							image.mimeType || 'image/png',
+							image.quality
+						)
+					)
+					if (blob) {
+						const fileName = `processed-${image.file.name.replace(
+							/\.[^/.]+$/,
+							''
+						)}.${
+							image.mimeType === 'image/jpeg'
+								? 'jpg'
+								: image.mimeType === 'image/webp'
+								? 'webp'
+								: 'png'
+						}`
+						zip.file(fileName, blob)
+					}
+				}
+			}
+
+			const content = await zip.generateAsync({ type: 'blob' })
+			saveAs(content, 'processed-images.zip')
+		}
+	}, [processedImages])
+
+	// Очищення URL при зміні компонента
+	useEffect(() => {
+		return () => {
+			processedImages.forEach(image => {
+				if (image.url && image.url.startsWith('blob:')) {
+					URL.revokeObjectURL(image.url)
+				}
+			})
+		}
+	}, [processedImages])
+
+	const formatFileSize = (bytes: number) => {
+		if (bytes === 0) return '0 Bytes'
+		const k = 1024
+		const sizes = ['Bytes', 'KB', 'MB', 'GB']
+		const i = Math.floor(Math.log(bytes) / Math.log(k))
+		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+	}
+
+	return (
+		<div className='max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden'>
+			{/* Вкладки */}
+			<div className='border-b border-gray-200 dark:border-gray-700'>
+				<nav className='-mb-px flex space-x-8 px-6'>
+					{tabs.map(tab => (
+						<button
+							key={tab.id}
+							onClick={() => setActiveTab(tab.id)}
+							className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+								activeTab === tab.id
+									? 'border-blue-500 text-blue-600 dark:text-blue-400'
+									: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+							}`}
+						>
+							<span>{tab.icon}</span>
+							<span>{tab.label}</span>
+						</button>
+					))}
+				</nav>
+			</div>
+
+			<div className='p-6'>
+				{/* Область завантаження файлів */}
+				<div
+					className='border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center mb-6 hover:border-blue-400 dark:hover:border-blue-500 transition-colors'
+					onDrop={handleDrop}
+					onDragOver={handleDragOver}
+				>
+					<input
+						ref={fileInputRef}
+						type='file'
+						multiple
+						accept='image/*'
+						onChange={handleImageSelect}
+						className='hidden'
+					/>
+
+					<div className='space-y-4'>
+						<div className='text-4xl'>📁</div>
+						<div>
+							<p className='text-lg font-medium text-gray-700 dark:text-gray-300'>
+								Перетягніть зображення сюди або натисніть для вибору
+							</p>
+							<p className='text-sm text-gray-500 dark:text-gray-400 mt-2'>
+								Підтримуються: PNG, JPG, JPEG, WebP, GIF
+							</p>
+						</div>
+						<button
+							onClick={() => fileInputRef.current?.click()}
+							className='bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors'
+						>
+							Вибрати файли
+						</button>
+					</div>
+				</div>
+
+				{/* Список вибраних зображень */}
+				{selectedImages.length > 0 && (
+					<div className='mb-6'>
+						<h3 className='text-lg font-semibold mb-4 text-gray-800 dark:text-white'>
+							Вибрані зображення ({selectedImages.length})
+						</h3>
+						<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+							{processedImages.map((image, index) => (
+								<div
+									key={index}
+									className='border border-gray-200 dark:border-gray-600 rounded-lg p-4'
+								>
+									<div className='aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg mb-3 overflow-hidden'>
+										{image.url ? (
+											// eslint-disable-next-line @next/next/no-img-element
+											<img
+												src={image.url}
+												alt={image.file.name}
+												className='w-full h-full object-cover'
+											/>
+										) : (
+											<div className='w-full h-full flex items-center justify-center text-gray-400'>
+												<span className='text-2xl'>🖼️</span>
+											</div>
+										)}
+									</div>
+									<p className='text-sm font-medium text-gray-700 dark:text-gray-300 truncate'>
+										{image.file.name}
+									</p>
+									<p className='text-xs text-gray-500 dark:text-gray-400'>
+										Оригінал: {formatFileSize(image.originalSize)}
+										{image.newSize && (
+											<>
+												{' → '}
+												<span
+													className={
+														image.newSize < image.originalSize
+															? 'text-green-600'
+															: 'text-red-600'
+													}
+												>
+													{formatFileSize(image.newSize)}
+												</span>
+											</>
+										)}
+									</p>
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
+				{/* Контент вкладок */}
+				{selectedImages.length > 0 && (
+					<div className='space-y-6'>
+						{/* Статистика обробки */}
+						{processedImages.some(img => img.canvas) && (
+							<ProcessingStats processedImages={processedImages} />
+						)}
+
+						{activeTab === 'format' && (
+							<FormatConverter
+								images={selectedImages}
+								onProcess={images => {
+									setProcessedImages(images)
+									if (images.some(img => img.canvas)) {
+										addToHistory('format', 'Конвертація формату', images)
+									}
+								}}
+								isProcessing={isProcessing}
+								setIsProcessing={setIsProcessing}
+							/>
+						)}
+						{activeTab === 'size' && (
+							<SizeConverter
+								images={selectedImages}
+								processedImages={processedImages}
+								onProcess={images => {
+									setProcessedImages(images)
+									if (images.some(img => img.canvas)) {
+										addToHistory('size', 'Зміна розміру', images)
+									}
+								}}
+								isProcessing={isProcessing}
+								setIsProcessing={setIsProcessing}
+							/>
+						)}
+						{activeTab === 'color' && (
+							<ColorTransform
+								images={selectedImages}
+								processedImages={processedImages}
+								onProcess={images => {
+									setProcessedImages(images)
+									if (images.some(img => img.canvas)) {
+										addToHistory('color', 'Перетворення кольорів', images)
+									}
+								}}
+								isProcessing={isProcessing}
+								setIsProcessing={setIsProcessing}
+							/>
+						)}
+						{activeTab === 'balance' && (
+							<ColorBalance
+								images={selectedImages}
+								processedImages={processedImages}
+								onProcess={images => {
+									setProcessedImages(images)
+									if (images.some(img => img.canvas)) {
+										addToHistory(
+											'balance',
+											'Корекція кольорового балансу',
+											images
+										)
+									}
+								}}
+								isProcessing={isProcessing}
+								setIsProcessing={setIsProcessing}
+							/>
+						)}
+
+						{/* Кнопка завантаження */}
+						{processedImages.some(img => img.canvas) && (
+							<div className='flex justify-center'>
+								<button
+									onClick={downloadAll}
+									disabled={isProcessing}
+									className='bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-8 py-3 rounded-lg transition-colors flex items-center space-x-2'
+								>
+									<span>💾</span>
+									<span>
+										{processedImages.length === 1
+											? 'Завантажити зображення'
+											: `Завантажити всі (${processedImages.length})`}
+									</span>
+								</button>
+							</div>
+						)}
+
+						{/* Історія змін */}
+						{history.length > 0 && (
+							<div className='mt-8 border-t border-gray-200 dark:border-gray-700 pt-6'>
+								<h3 className='text-lg font-semibold mb-4 text-gray-800 dark:text-white flex items-center'>
+									<span className='mr-2'>📜</span>
+									Історія змін
+								</h3>
+								<div className='space-y-3 max-h-96 overflow-y-auto'>
+									{history.map((entry, index) => (
+										<div
+											key={entry.id}
+											className='bg-gray-50 dark:bg-gray-700 rounded-lg p-4 flex items-center justify-between'
+										>
+											<div className='flex-1'>
+												<div className='flex items-center space-x-3'>
+													<span className='text-sm font-medium text-gray-600 dark:text-gray-300'>
+														#{history.length - index}
+													</span>
+													<span className='font-medium text-gray-800 dark:text-white'>
+														{entry.description}
+													</span>
+													<span className='text-xs text-gray-500 dark:text-gray-400'>
+														{entry.timestamp.toLocaleString('uk-UA', {
+															day: '2-digit',
+															month: '2-digit',
+															year: 'numeric',
+															hour: '2-digit',
+															minute: '2-digit',
+														})}
+													</span>
+												</div>
+												<div className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+													{entry.processedImages.length} файл(ів)
+													{entry.processedImages[0]?.newSize && (
+														<span className='ml-2'>
+															→{' '}
+															{formatFileSize(entry.processedImages[0].newSize)}
+														</span>
+													)}
+												</div>
+											</div>
+											<div className='flex items-center space-x-2 ml-4'>
+												<button
+													onClick={() => restoreFromHistory(entry)}
+													className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors flex items-center space-x-1'
+													title='Відновити цей стан'
+												>
+													<span>↩️</span>
+													<span>Відновити</span>
+												</button>
+												<button
+													onClick={() => downloadFromHistory(entry)}
+													className='bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs transition-colors flex items-center space-x-1'
+													title='Завантажити файли з цього стану'
+												>
+													<span>💾</span>
+													<span>Завантажити</span>
+												</button>
+											</div>
+										</div>
+									))}
+								</div>
+								<div className='mt-4 text-center'>
+									<button
+										onClick={() => setHistory([])}
+										className='text-red-500 hover:text-red-700 text-sm transition-colors flex items-center justify-center mx-auto space-x-1'
+									>
+										<span>🗑️</span>
+										<span>Очистити історію</span>
+									</button>
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+		</div>
+	)
+}
+
+export default ImageProcessor
