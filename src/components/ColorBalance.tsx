@@ -282,24 +282,6 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 					))}
 				</div>
 
-				<div className='mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg'>
-					<div className='flex items-start space-x-3'>
-						<span className='text-yellow-600 dark:text-yellow-400 mt-0.5'>
-							⚠️
-						</span>
-						<div className='text-sm'>
-							<p className='font-medium text-yellow-800 dark:text-yellow-200 mb-1'>
-								Поради щодо корекції
-							</p>
-							<ul className='text-yellow-700 dark:text-yellow-300 space-y-1'>
-								<li>• Невеликі зміни дають кращий результат</li>
-								<li>• Надмірна корекція може призвести до втрати деталей</li>
-								<li>• Рекомендуємо змінювати значення поступово</li>
-							</ul>
-						</div>
-					</div>
-				</div>
-
 				<div className='mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg'>
 					<div className='flex items-center justify-between'>
 						<div>
