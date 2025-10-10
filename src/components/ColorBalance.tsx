@@ -24,6 +24,7 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 	const [brightness, setBrightness] = useState(0)
 	const [contrast, setContrast] = useState(0)
 	const [saturation, setSaturation] = useState(0)
+	const [opacity, setOpacity] = useState(100)
 
 	const adjustImages = async () => {
 		if (images.length === 0) return
@@ -131,6 +132,10 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 						data[i] = Math.round(r)
 						data[i + 1] = Math.round(g)
 						data[i + 2] = Math.round(b)
+
+						if (opacity < 100) {
+							data[i + 3] = Math.round((data[i + 3] * opacity) / 100)
+						}
 					}
 
 					ctx.putImageData(imageData, 0, 0)
@@ -167,6 +172,7 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 		setBrightness(0)
 		setContrast(0)
 		setSaturation(0)
+		setOpacity(100)
 	}
 
 	const formatFileSize = (bytes: number) => {
@@ -222,6 +228,15 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 			color: 'purple',
 			icon: '🌈',
 		},
+		{
+			label: 'Прозорість',
+			value: opacity,
+			min: 0,
+			max: 100,
+			setter: setOpacity,
+			color: 'cyan',
+			icon: '💧',
+		},
 	]
 
 	return (
@@ -248,14 +263,15 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 									<span>{adj.label}</span>
 								</label>
 								<span className='text-sm text-gray-500 dark:text-gray-400'>
-									{adj.value > 0 ? '+' : ''}
-									{adj.value}
+									{adj.label === 'Прозорість'
+										? `${adj.value}%`
+										: `${adj.value > 0 ? '+' : ''}${adj.value}`}
 								</span>
 							</div>
 							<input
 								type='range'
-								min='-100'
-								max='100'
+								min={adj.min !== undefined ? adj.min : -100}
+								max={adj.max !== undefined ? adj.max : 100}
 								step='1'
 								value={adj.value}
 								onChange={e => adj.setter(parseInt(e.target.value))}
@@ -270,13 +286,15 @@ const ColorBalance: React.FC<ColorBalanceProps> = ({
 										? 'bg-yellow-200 dark:bg-yellow-800'
 										: adj.color === 'purple'
 										? 'bg-purple-200 dark:bg-purple-800'
+										: adj.color === 'cyan'
+										? 'bg-cyan-200 dark:bg-cyan-800'
 										: 'bg-gray-200 dark:bg-gray-600'
 								}`}
 							/>
 							<div className='flex justify-between text-xs text-gray-500 dark:text-gray-400'>
-								<span>-100</span>
-								<span>0</span>
-								<span>+100</span>
+								<span>{adj.min !== undefined ? adj.min : -100}</span>
+								<span>{adj.label === 'Прозорість' ? '50' : '0'}</span>
+								<span>{adj.max !== undefined ? adj.max : 100}</span>
 							</div>
 						</div>
 					))}

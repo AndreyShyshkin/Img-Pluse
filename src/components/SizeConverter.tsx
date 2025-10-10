@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ProcessedImage } from './ImageProcessor'
 
 interface SizeConverterProps {
@@ -19,18 +19,31 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 	setIsProcessing,
 }) => {
 	const [resizeMode, setResizeMode] = useState<
-		'percentage' | 'fixed' | 'width' | 'height'
+		'percentage' | 'fixed' | 'width' | 'height' | 'crop'
 	>('percentage')
 	const [percentage, setPercentage] = useState(100)
 	const [width, setWidth] = useState(800)
 	const [height, setHeight] = useState(600)
 	const [maintainAspect, setMaintainAspect] = useState(true)
 
+	const [cropArea, setCropArea] = useState({
+		x: 0,
+		y: 0,
+		width: 100,
+		height: 100,
+	})
+	const [isDragging, setIsDragging] = useState(false)
+	const [dragHandle, setDragHandle] = useState<string | null>(null)
+	const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+	const canvasRef = useRef<HTMLCanvasElement>(null)
+	const previewRef = useRef<HTMLDivElement>(null)
+
 	const resizeModes = [
 		{ value: 'percentage' as const, label: 'За відсотками', icon: '%' },
 		{ value: 'fixed' as const, label: 'Фіксований розмір', icon: '📐' },
 		{ value: 'width' as const, label: 'За шириною', icon: '↔️' },
 		{ value: 'height' as const, label: 'За висотою', icon: '↕️' },
+		{ value: 'crop' as const, label: 'Кадрування', icon: '✂️' },
 	]
 
 	const resizeImages = async () => {
@@ -112,15 +125,46 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 							newWidth = Math.round(img.width * (height / img.height))
 						}
 						break
+
+					case 'crop':
+						const cropX = Math.round((img.width * cropArea.x) / 100)
+						const cropY = Math.round((img.height * cropArea.y) / 100)
+						const cropWidth = Math.round((img.width * cropArea.width) / 100)
+						const cropHeight = Math.round((img.height * cropArea.height) / 100)
+
+						newWidth = cropWidth
+						newHeight = cropHeight
+
+						outputCanvas.width = newWidth
+						outputCanvas.height = newHeight
+
+						if (outputCtx) {
+							outputCtx.imageSmoothingEnabled = true
+							outputCtx.imageSmoothingQuality = 'high'
+							outputCtx.drawImage(
+								canvas,
+								cropX,
+								cropY,
+								cropWidth,
+								cropHeight,
+								0,
+								0,
+								newWidth,
+								newHeight
+							)
+						}
+						break
 				}
 
-				outputCanvas.width = newWidth
-				outputCanvas.height = newHeight
+				if (resizeMode !== 'crop') {
+					outputCanvas.width = newWidth
+					outputCanvas.height = newHeight
 
-				if (outputCtx) {
-					outputCtx.imageSmoothingEnabled = true
-					outputCtx.imageSmoothingQuality = 'high'
-					outputCtx.drawImage(canvas, 0, 0, newWidth, newHeight)
+					if (outputCtx) {
+						outputCtx.imageSmoothingEnabled = true
+						outputCtx.imageSmoothingQuality = 'high'
+						outputCtx.drawImage(canvas, 0, 0, newWidth, newHeight)
+					}
 				}
 
 				const blob = await new Promise<Blob | null>(resolve =>
@@ -157,6 +201,92 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 	}
 
 	const totalOriginalSize = images.reduce((sum, img) => sum + img.size, 0)
+
+	useEffect(() => {
+		if (resizeMode === 'crop' && images.length > 0 && canvasRef.current) {
+			const canvas = canvasRef.current
+			const ctx = canvas.getContext('2d')
+			const img = new Image()
+
+			img.onload = () => {
+				canvas.width = img.width
+				canvas.height = img.height
+				ctx?.drawImage(img, 0, 0)
+
+				setCropArea({
+					x: 25,
+					y: 25,
+					width: 50,
+					height: 50,
+				})
+			}
+
+			img.src = URL.createObjectURL(images[0])
+		}
+	}, [resizeMode, images])
+
+	useEffect(() => {
+		const handleMouseMove = (e: MouseEvent) => {
+			if (!isDragging || !previewRef.current || !dragHandle) return
+
+			const rect = previewRef.current.getBoundingClientRect()
+			const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100
+			const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100
+
+			setCropArea(prev => {
+				const newArea = { ...prev }
+
+				if (dragHandle === 'move') {
+					newArea.x = Math.max(0, Math.min(100 - prev.width, prev.x + deltaX))
+					newArea.y = Math.max(0, Math.min(100 - prev.height, prev.y + deltaY))
+				} else {
+					if (dragHandle.includes('e')) {
+						newArea.width = Math.max(
+							5,
+							Math.min(100 - prev.x, prev.width + deltaX)
+						)
+					}
+					if (dragHandle.includes('w')) {
+						const newWidth = Math.max(5, prev.width - deltaX)
+						const widthDiff = prev.width - newWidth
+						newArea.width = newWidth
+						newArea.x = Math.max(0, prev.x + widthDiff)
+					}
+					if (dragHandle.includes('s')) {
+						newArea.height = Math.max(
+							5,
+							Math.min(100 - prev.y, prev.height + deltaY)
+						)
+					}
+					if (dragHandle.includes('n')) {
+						const newHeight = Math.max(5, prev.height - deltaY)
+						const heightDiff = prev.height - newHeight
+						newArea.height = newHeight
+						newArea.y = Math.max(0, prev.y + heightDiff)
+					}
+				}
+
+				return newArea
+			})
+
+			setDragStart({ x: e.clientX, y: e.clientY })
+		}
+
+		const handleMouseUp = () => {
+			setIsDragging(false)
+			setDragHandle(null)
+		}
+
+		if (isDragging) {
+			window.addEventListener('mousemove', handleMouseMove)
+			window.addEventListener('mouseup', handleMouseUp)
+
+			return () => {
+				window.removeEventListener('mousemove', handleMouseMove)
+				window.removeEventListener('mouseup', handleMouseUp)
+			}
+		}
+	}, [isDragging, dragHandle, dragStart])
 
 	return (
 		<div className='space-y-6'>
@@ -281,6 +411,131 @@ const SizeConverter: React.FC<SizeConverterProps> = ({
 						</div>
 					</div>
 				</div>
+
+				{/* Інтерактивне кадрування */}
+				{resizeMode === 'crop' && images.length > 0 && (
+					<div className='mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg'>
+						<h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-3'>
+							Перетягніть рамку для вибору області кадрування
+						</h4>
+						<div
+							ref={previewRef}
+							className='relative w-full max-w-md mx-auto bg-gray-200 dark:bg-gray-700 rounded overflow-hidden'
+							style={{ maxHeight: '400px' }}
+						>
+							<canvas ref={canvasRef} className='w-full h-auto' />
+							{/* Напівпрозора overlay для затемнення */}
+							<div className='absolute inset-0 pointer-events-none'>
+								<svg className='w-full h-full'>
+									<defs>
+										<mask id='crop-mask'>
+											<rect width='100%' height='100%' fill='white' />
+											<rect
+												x={`${cropArea.x}%`}
+												y={`${cropArea.y}%`}
+												width={`${cropArea.width}%`}
+												height={`${cropArea.height}%`}
+												fill='black'
+											/>
+										</mask>
+									</defs>
+									<rect
+										width='100%'
+										height='100%'
+										fill='rgba(0,0,0,0.5)'
+										mask='url(#crop-mask)'
+									/>
+								</svg>
+							</div>
+							{/* Рамка кадрування */}
+							<div
+								className='absolute border-2 border-blue-500 cursor-move'
+								style={{
+									left: `${cropArea.x}%`,
+									top: `${cropArea.y}%`,
+									width: `${cropArea.width}%`,
+									height: `${cropArea.height}%`,
+								}}
+								onMouseDown={e => {
+									if (e.target === e.currentTarget) {
+										setIsDragging(true)
+										setDragHandle('move')
+										setDragStart({ x: e.clientX, y: e.clientY })
+									}
+								}}
+							>
+								{/* Кути для зміни розміру */}
+								{['nw', 'ne', 'sw', 'se'].map(handle => (
+									<div
+										key={handle}
+										className='absolute w-3 h-3 bg-blue-500 border border-white cursor-pointer'
+										style={{
+											top: handle.includes('n') ? '-6px' : 'auto',
+											bottom: handle.includes('s') ? '-6px' : 'auto',
+											left: handle.includes('w') ? '-6px' : 'auto',
+											right: handle.includes('e') ? '-6px' : 'auto',
+											cursor:
+												handle === 'nw' || handle === 'se'
+													? 'nwse-resize'
+													: 'nesw-resize',
+										}}
+										onMouseDown={e => {
+											e.stopPropagation()
+											setIsDragging(true)
+											setDragHandle(handle)
+											setDragStart({ x: e.clientX, y: e.clientY })
+										}}
+									/>
+								))}
+								{/* Середини сторін для зміни розміру */}
+								{['n', 'e', 's', 'w'].map(handle => (
+									<div
+										key={handle}
+										className='absolute bg-blue-500 border border-white cursor-pointer'
+										style={{
+											width: handle === 'n' || handle === 's' ? '20px' : '3px',
+											height: handle === 'e' || handle === 'w' ? '20px' : '3px',
+											top:
+												handle === 'n'
+													? '-6px'
+													: handle === 's'
+													? 'auto'
+													: '50%',
+											bottom: handle === 's' ? '-6px' : 'auto',
+											left:
+												handle === 'w'
+													? '-6px'
+													: handle === 'e'
+													? 'auto'
+													: '50%',
+											right: handle === 'e' ? '-6px' : 'auto',
+											transform:
+												handle === 'n' || handle === 's'
+													? 'translateX(-50%)'
+													: handle === 'e' || handle === 'w'
+													? 'translateY(-50%)'
+													: 'none',
+											cursor:
+												handle === 'n' || handle === 's'
+													? 'ns-resize'
+													: 'ew-resize',
+										}}
+										onMouseDown={e => {
+											e.stopPropagation()
+											setIsDragging(true)
+											setDragHandle(handle)
+											setDragStart({ x: e.clientX, y: e.clientY })
+										}}
+									/>
+								))}
+							</div>
+						</div>
+						<div className='mt-3 text-xs text-gray-600 dark:text-gray-400 text-center'>
+							💡 Перетягуйте рамку або змінюйте її розмір за допомогою кутів та
+							країв
+						</div>
+					</div>
+				)}
 
 				<div className='mt-6'>
 					<button
