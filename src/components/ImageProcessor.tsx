@@ -6,8 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ColorBalance from './ColorBalance'
 import ColorTransform from './ColorTransform'
 import FormatConverter from './FormatConverter'
+import ImageMerger from './ImageMerger'
 import ProcessingStats from './ProcessingStats'
 import SizeConverter from './SizeConverter'
+import Slideshow from './Slideshow'
+import WatermarkTool from './WatermarkTool'
 
 export interface ProcessedImage {
 	file: File
@@ -32,9 +35,16 @@ const ImageProcessor: React.FC = () => {
 	const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
 	const [history, setHistory] = useState<HistoryEntry[]>([])
 	const [activeTab, setActiveTab] = useState<
-		'format' | 'size' | 'color' | 'balance'
+		| 'format'
+		| 'size'
+		| 'color'
+		| 'balance'
+		| 'merge'
+		| 'watermark'
+		| 'slideshow'
 	>('format')
 	const [isProcessing, setIsProcessing] = useState(false)
+	const [showStartScreen, setShowStartScreen] = useState(true)
 	const fileInputRef = useRef<HTMLInputElement>(null)
 
 	const tabs = [
@@ -42,6 +52,9 @@ const ImageProcessor: React.FC = () => {
 		{ id: 'size' as const, label: 'Зміна розміру', icon: '📏' },
 		{ id: 'color' as const, label: 'Перетворення кольорів', icon: '🎨' },
 		{ id: 'balance' as const, label: 'Колірний баланс', icon: '⚖️' },
+		{ id: 'merge' as const, label: "Об'єднання", icon: '🖼️' },
+		{ id: 'watermark' as const, label: 'Водяний знак', icon: '💧' },
+		{ id: 'slideshow' as const, label: 'Слайд-шоу', icon: '🎬' },
 	]
 
 	const handleImageSelect = useCallback(
@@ -278,25 +291,118 @@ const ImageProcessor: React.FC = () => {
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 	}
 
+	const handleToolSelect = useCallback((toolId: typeof activeTab) => {
+		setActiveTab(toolId)
+		setShowStartScreen(false)
+	}, [])
+
+	// Start screen
+	if (showStartScreen) {
+		return (
+			<div className='min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-8'>
+				<div className='max-w-5xl mx-auto'>
+					{/* Upload area */}
+					<div
+						className='bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-12 mb-12 border-4 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-pointer'
+						onDrop={handleDrop}
+						onDragOver={handleDragOver}
+						onClick={() => fileInputRef.current?.click()}
+					>
+						<input
+							ref={fileInputRef}
+							type='file'
+							multiple
+							accept='image/*'
+							onChange={handleImageSelect}
+							className='hidden'
+						/>
+						<div className='text-center'>
+							<div className='text-7xl mb-6'>📁</div>
+							<h2 className='text-2xl font-semibold text-gray-800 dark:text-white mb-3'>
+								Завантажте зображення
+							</h2>
+							<p className='text-gray-600 dark:text-gray-400 mb-4'>
+								Перетягніть файли сюди або клацніть для вибору
+							</p>
+							<p className='text-sm text-gray-500 dark:text-gray-500'>
+								Підтримуються: JPG, PNG, WebP, GIF
+							</p>
+						</div>
+					</div>
+
+					{/* Tools grid */}
+					<div className='mb-8'>
+						<h3 className='text-2xl font-semibold text-gray-800 dark:text-white mb-6 text-center'>
+							{selectedImages.length > 0
+								? `Завантажено ${selectedImages.length} ${
+										selectedImages.length === 1 ? 'зображення' : 'зображень'
+								  }. Оберіть інструмент:`
+								: 'Оберіть інструмент'}
+						</h3>
+						<div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+							{tabs.map(tab => (
+								<button
+									key={tab.id}
+									onClick={() => handleToolSelect(tab.id)}
+									disabled={selectedImages.length === 0}
+									className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-2xl transition-all p-6 text-center group hover:scale-105 border-2 border-transparent hover:border-blue-400 ${
+										selectedImages.length === 0
+											? 'opacity-50 cursor-not-allowed'
+											: ''
+									}`}
+								>
+									<div className='text-5xl mb-3 group-hover:scale-110 transition-transform'>
+										{tab.icon}
+									</div>
+									<h4 className='font-semibold text-gray-800 dark:text-white mb-1'>
+										{tab.label}
+									</h4>
+								</button>
+							))}
+						</div>
+					</div>
+				</div>
+			</div>
+		)
+	}
+
 	return (
 		<div className='max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden'>
+			{/* Header with back button */}
+			<div className=' px-6 py-3 flex items-center justify-between'>
+				<button
+					onClick={() => {
+						setShowStartScreen(true)
+						setSelectedImages([])
+						setProcessedImages([])
+						setHistory([])
+					}}
+					className='text-gray hover:bg-white/20 px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 cursor-pointer'
+				>
+					<span>←</span>
+					<span>Головна</span>
+				</button>
+			</div>
+
 			<div className='border-b border-gray-200 dark:border-gray-700'>
-				<nav className='-mb-px flex space-x-8 px-6'>
-					{tabs.map(tab => (
-						<button
-							key={tab.id}
-							onClick={() => setActiveTab(tab.id)}
-							className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-								activeTab === tab.id
-									? 'border-blue-500 text-blue-600 dark:text-blue-400'
-									: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-							}`}
-						>
-							<span>{tab.icon}</span>
-							<span>{tab.label}</span>
-						</button>
-					))}
-				</nav>
+				<div className='overflow-x-auto'>
+					<nav className='-mb-px flex space-x-8 px-6 min-w-max'>
+						{tabs.map(tab => (
+							<button
+								key={tab.id}
+								onClick={() => setActiveTab(tab.id)}
+								className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+									activeTab === tab.id
+										? 'border-blue-500 text-blue-600 dark:text-blue-400'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+								}`}
+							>
+								<span>{tab.icon}</span>
+								<span>{tab.label}</span>
+							</button>
+						))}
+					</nav>
+				</div>
 			</div>
 
 			<div className='p-6'>
@@ -443,6 +549,44 @@ const ImageProcessor: React.FC = () => {
 								}}
 								isProcessing={isProcessing}
 								setIsProcessing={setIsProcessing}
+							/>
+						)}
+						{activeTab === 'merge' && (
+							<ImageMerger
+								images={selectedImages}
+								processedImages={processedImages}
+								onProcess={images => {
+									setProcessedImages(images)
+									if (images.some(img => img.canvas)) {
+										addToHistory('merge', "Об'єднання зображень", images)
+									}
+								}}
+								isProcessing={isProcessing}
+								setIsProcessing={setIsProcessing}
+							/>
+						)}
+						{activeTab === 'watermark' && (
+							<WatermarkTool
+								images={selectedImages}
+								processedImages={processedImages}
+								onProcess={images => {
+									setProcessedImages(images)
+									if (images.some(img => img.canvas)) {
+										addToHistory(
+											'watermark',
+											'Додавання водяного знаку',
+											images
+										)
+									}
+								}}
+								isProcessing={isProcessing}
+								setIsProcessing={setIsProcessing}
+							/>
+						)}
+						{activeTab === 'slideshow' && (
+							<Slideshow
+								images={selectedImages}
+								processedImages={processedImages}
 							/>
 						)}
 
